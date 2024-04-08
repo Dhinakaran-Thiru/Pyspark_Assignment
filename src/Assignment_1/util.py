@@ -1,48 +1,58 @@
 from pyspark.sql.types import StructType, StructField, IntegerType, StringType
-from pyspark.sql.functions import collect_set, array_contains, col
-
-
-def create_dataframes(spark):
-    purchase_data = [
-        (1, "A"), (1, "B"), (2, "A"), (2, "B"), (3, "A"),
-        (3, "B"), (1, "C"), (1, "D"), (1, "E"), (3, "E"), (4, "A")
-    ]
-
-    product_data = [("A",), ("B",), ("C",), ("D",), ("E",)]
-
+from pyspark.sql.functions import *
+def create_purchase_data_df(spark):
     purchase_schema = StructType([
         StructField("customer", IntegerType(), True),
-        StructField("product_model", StringType(), True)
-    ])
+        StructField("product_model", StringType(), True)])
 
+    purchase_data = [
+        (1, "iphone13"),
+        (1, "dell i5 core"),
+        (2, "iphone13"),
+        (2, "dell i5 core"),
+        (3, "iphone13"),
+        (3, "dell i5 core"),
+        (1, "dell i3 core"),
+        (1, "hp i5 core"),
+        (1, "iphone14"),
+        (3, "iphone14"),
+        (4, "iphone13")]
+
+    return spark.createDataFrame(purchase_data, schema=purchase_schema)
+
+def create_product_data_df(spark):
     product_schema = StructType([
-        StructField("product_model", StringType(), True)
-    ])
+        StructField("product_model", StringType(), True)])
 
-    purchase_data_df = spark.createDataFrame(purchase_data, schema=purchase_schema)
-    product_data_df = spark.createDataFrame(product_data, schema=product_schema)
+    product_data = [
+        ("iphone13",),
+        ("dell i5 core",),
+        ("dell i3 core",),
+        ("hp i5 core",),
+        ("iphone14",)
+    ]
 
-    return purchase_data_df, product_data_df
+    return spark.createDataFrame(product_data, schema=product_schema)
 
-def find_customers_only_product_A(purchase_data_df):
-    return purchase_data_df.groupBy("customer") \
-        .agg({"product_model": "collect_set"}) \
-        .filter("size(collect_set(product_model)) = 1 and collect_set(product_model)[0] = 'A'") \
-        .select("customer")
 
-def find_customers_upgraded_B_to_E(purchase_data_df):
-    customers_B = purchase_data_df.filter("product_model = 'B'").select("customer")
-    customers_E = purchase_data_df.filter("product_model = 'E'").select("customer")
-    return customers_B.intersect(customers_E)
+# only get the customer who purchased iphone 13 only
+def find_customers_with_only_iphone13(purchase_data_df, product_data_df):
+    filtered_purchase_df = purchase_data_df.groupBy("customer").count()
+    count = filtered_purchase_df.filter("count = 1")
+    res_df = count.join(purchase_data_df, "customer").join(product_data_df, "product_model").filter("product_model = 'iphone13'").select("customer")
+    return res_df
 
-def find_customers_all_models(purchase_data_df):
-    return purchase_data_df.groupBy("customer") \
-        .agg(collect_set("product_model").alias("purchased_models")) \
-        .filter(
-            array_contains(col("purchased_models"), "A") &
-            array_contains(col("purchased_models"), "B") &
-            array_contains(col("purchased_models"), "C") &
-            array_contains(col("purchased_models"), "D") &
-            array_contains(col("purchased_models"), "E")
-        ) \
-        .select("customer")
+
+def find_customers_upgraded_to_iphone14(purchase_data_df):
+    iphone13_customers = purchase_data_df.filter(purchase_data_df['product_model'] == 'iphone13')
+    iphone14_customers = purchase_data_df.filter(purchase_data_df['product_model'] == 'iphone14')
+    upgraded_customers = iphone13_customers.join(iphone14_customers, "customer", "inner")
+    upgraded_customers_distinct = upgraded_customers.select("customer").distinct()
+    return upgraded_customers_distinct
+
+
+def find_customers_bought_all_products(purchase_data_df, product_data_df):
+    unique_product_models = product_data_df.select("product_model").distinct()
+    customer_product_count = purchase_data_df.groupBy("customer").agg(countDistinct("product_model").alias("product_count"))
+    customers_bought_all_products = customer_product_count.filter(customer_product_count["product_count"] == unique_product_models.count()).select("customer")
+    return customers_bought_all_products
