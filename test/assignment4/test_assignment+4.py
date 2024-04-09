@@ -1,6 +1,6 @@
 import unittest
 
-from Pyspark_Assignment.src.assignment_4.util import *
+from src.Assignment4.util import *
 
 
 class TestAssignment4(unittest.TestCase):
