@@ -1,15 +1,11 @@
 import unittest
-from Pyspark_Assignment.src.Assignment_3.util import *
+from src.Assignment3.util import *
 
 
 class TestAssignment3(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.spark = SparkSession.builder.appName("PySpark Assignment").getOrCreate()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.spark.stop()
 
     def test_rename_df(self):
         df = create_df(self.spark, log_data, log_schema)
@@ -36,7 +32,7 @@ class TestAssignment3(unittest.TestCase):
     def test_no_of_action_performed(self):
         df = create_df(self.spark, log_data, log_schema)
         df = updateColumnName(df)
-        expected_df = action_performed_last_7_days(df)
+        expected_df = action_performed_last_7(df)
         self.assertEqual(expected_df.count(), 3)
 
     def test_login_date(self):
